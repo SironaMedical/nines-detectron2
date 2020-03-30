@@ -118,7 +118,7 @@ class GeneralizedRCNN(nn.Module):
         else:
             gt_instances = None
 
-        features = self.backbone(images.tensor)
+        features = self.backbone(images)
 
         if self.proposal_generator:
             proposals, proposal_losses = self.proposal_generator(images, features, gt_instances)
@@ -158,7 +158,7 @@ class GeneralizedRCNN(nn.Module):
         assert not self.training
 
         images = self.preprocess_image(batched_inputs)
-        features = self.backbone(images.tensor)
+        features = self.backbone(images)
 
         if detected_instances is None:
             if self.proposal_generator:
@@ -173,7 +173,7 @@ class GeneralizedRCNN(nn.Module):
             results = self.roi_heads.forward_with_given_boxes(features, detected_instances)
 
         if do_postprocess:
-            return GeneralizedRCNN._postprocess(results, batched_inputs, images.image_sizes)
+            return GeneralizedRCNN._postprocess(results, batched_inputs, images[0].image_sizes)
         else:
             return results
 
@@ -181,10 +181,16 @@ class GeneralizedRCNN(nn.Module):
         """
         Normalize, pad and batch the input images.
         """
-        images = [x["image"].to(self.device) for x in batched_inputs]
-        images = [self.normalizer(x) for x in images]
-        images = ImageList.from_tensors(images, self.backbone.size_divisibility)
-        return images
+        res = []
+        slabs = [x["image"].to(self.device) for x in batched_inputs]
+        for i in range(3):
+            r = []
+            for slab in slabs:
+                image = slab[[i, i + 1, i + 2]]
+                image = self.normalizer(image)
+                r.append(image)
+            res.append(ImageList.from_tensors(r, self.backbone.size_divisibility))
+        return res
 
     @staticmethod
     def _postprocess(instances, batched_inputs, image_sizes):

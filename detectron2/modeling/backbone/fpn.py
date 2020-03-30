@@ -4,6 +4,9 @@ import fvcore.nn.weight_init as weight_init
 import torch.nn.functional as F
 from torch import nn
 
+import collections
+import torch
+
 from detectron2.layers import Conv2d, ShapeSpec, get_norm
 
 from .backbone import Backbone
@@ -52,6 +55,13 @@ class FPN(Backbone):
         input_shapes = bottom_up.output_shape()
         in_strides = [input_shapes[f].stride for f in in_features]
         in_channels = [input_shapes[f].channels for f in in_features]
+
+        self.mapping_convs = []
+        for i, in_channels_i in enumerate(in_channels):
+            mapping_conv = Conv2d(in_channels_i * 3, in_channels_i, kernel_size=1)
+            weight_init.c2_xavier_fill(mapping_conv)
+            self.add_module("fpn_mapping{}".format(i), mapping_conv)
+            self.mapping_convs.append(mapping_conv)
 
         _assert_strides_are_log2_contiguous(in_strides)
         lateral_convs = []
@@ -120,7 +130,18 @@ class FPN(Backbone):
                 ["p2", "p3", ..., "p6"].
         """
         # Reverse feature maps into top-down order (from low to high resolution)
-        bottom_up_features = self.bottom_up(x)
+        buf = collections.defaultdict(list)
+        for x_i in x:
+            bottom_up_features_i = self.bottom_up(x_i.tensor)
+            for k, v in bottom_up_features_i.items():
+                buf[k].append(v)
+        bottom_up_features = {}
+        i = 0
+        for k, vs in buf.items():
+            v = torch.cat(vs, dim=1)
+            mv = self.mapping_convs[i](v)
+            bottom_up_features[k] = mv
+            i = i + 1
         x = [bottom_up_features[f] for f in self.in_features[::-1]]
         results = []
         prev_features = self.lateral_convs[0](x[0])
