@@ -77,7 +77,10 @@ def find_top_rrpn_proposals(
         proposals (list[Instances]): list of N Instances. The i-th Instances
             stores post_nms_topk object proposals for image i.
     """
-    image_sizes = images.image_sizes  # in (h, w) order
+    if isintance(images, list):
+        image_sizes = images[0].image_sizes  # in (h, w) order
+    else:
+        image_sizes = images.image_sizes  # in (h, w) order
     num_images = len(image_sizes)
     device = proposals[0].device
 
@@ -103,7 +106,9 @@ def find_top_rrpn_proposals(
 
         topk_proposals.append(topk_proposals_i)
         topk_scores.append(topk_scores_i)
-        level_ids.append(torch.full((num_proposals_i,), level_id, dtype=torch.int64, device=device))
+        level_ids.append(
+            torch.full((num_proposals_i,), level_id, dtype=torch.int64, device=device)
+        )
 
     # 2. Concat all levels together
     topk_scores = cat(topk_scores, dim=1)

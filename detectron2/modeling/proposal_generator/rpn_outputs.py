@@ -89,7 +89,10 @@ def find_top_rpn_proposals(
             stores post_nms_topk object proposals for image i, sorted by their
             objectness score in descending order.
     """
-    image_sizes = images[0].image_sizes  # in (h, w) order
+    if isintance(images, list):
+        image_sizes = images[0].image_sizes  # in (h, w) order
+    else:
+        image_sizes = images.image_sizes  # in (h, w) order
     num_images = len(image_sizes)
     device = proposals[0].device
 
@@ -115,7 +118,9 @@ def find_top_rpn_proposals(
 
         topk_proposals.append(topk_proposals_i)
         topk_scores.append(topk_scores_i)
-        level_ids.append(torch.full((num_proposals_i,), level_id, dtype=torch.int64, device=device))
+        level_ids.append(
+            torch.full((num_proposals_i,), level_id, dtype=torch.int64, device=device)
+        )
 
     # 2. Concat all levels together
     topk_scores = cat(topk_scores, dim=1)
@@ -247,8 +252,12 @@ class RPNOutputs(object):
         self.anchors = anchors
         self.gt_boxes = gt_boxes
         self.num_feature_maps = len(pred_objectness_logits)
-        self.num_images = len(images[0])
-        self.image_sizes = images[0].image_sizes
+        if isintance(images, list):
+            self.num_images = len(images[0])
+            self.image_sizes = images[0].image_sizes
+        else:
+            self.num_images = len(images)
+            self.image_sizes = images.image_sizes
         self.boundary_threshold = boundary_threshold
         self.smooth_l1_beta = smooth_l1_beta
 

@@ -175,7 +175,11 @@ class GeneralizedRCNN(nn.Module):
             results = self.roi_heads.forward_with_given_boxes(features, detected_instances)
 
         if do_postprocess:
-            return GeneralizedRCNN._postprocess(results, batched_inputs, images[0].image_sizes)
+            if isinstance(images, list):
+                images_sizes = images[0].image_sizes
+            else:
+                images_sizes = images.image_sizes
+            return GeneralizedRCNN._postprocess(results, batched_inputs, image_sizes)
         else:
             return results
 
@@ -184,6 +188,10 @@ class GeneralizedRCNN(nn.Module):
         Normalize, pad and batch the input images.
         """
         if self.late_fusion:
+            # ipdb> p len(batched_inputs)
+            # 2020-04-02 22:10:21 pid:4378 STDOUT:INFO - 8
+            # ipdb> p batched_inputs[0]['image'].shape
+            # 2020-04-02 22:05:58 pid:1170 STDOUT:INFO - torch.Size([5, 512, 512])
             res = []
             slabs = [x["image"].to(self.device) for x in batched_inputs]
             for i in range(3):
@@ -193,12 +201,24 @@ class GeneralizedRCNN(nn.Module):
                     image = self.normalizer(image)
                     r.append(image)
                 res.append(ImageList.from_tensors(r, self.backbone.size_divisibility))
+            # ipdb> p len(res)
+            # 2020-04-02 22:08:54 pid:4378 STDOUT:INFO - 3
+            # ipdb> p res[0]
+            # 2020-04-02 22:09:15 pid:4378 STDOUT:INFO - <detectron2.structures.image_list.ImageList object at 0x7fab23f5b7b8>
+            # ipdb> p res[0].tensor.shape
+            # 2020-04-02 22:09:28 pid:4378 STDOUT:INFO - torch.Size([8, 3, 512, 512])
             return res
         else:
+            # ipdb> p len(batched_inputs)
+            # 2020-04-02 22:12:58 pid:6335 STDOUT:INFO - 8
+            # ipdb> p batched_inputs[0]['image'].shape
+            # 2020-04-02 22:13:10 pid:6335 STDOUT:INFO - torch.Size([3, 512, 512])
             images = [x["image"].to(self.device) for x in batched_inputs]
             images = [self.normalizer(x) for x in images]
             images = ImageList.from_tensors(images, self.backbone.size_divisibility)
-            return [images]
+            # ipdb> p images.tensor.shape
+            # 2020-04-02 22:13:30 pid:6335 STDOUT:INFO - torch.Size([8, 3, 512, 512])
+            return images
 
     @staticmethod
     def _postprocess(instances, batched_inputs, image_sizes):
