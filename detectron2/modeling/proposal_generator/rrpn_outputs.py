@@ -77,7 +77,7 @@ def find_top_rrpn_proposals(
         proposals (list[Instances]): list of N Instances. The i-th Instances
             stores post_nms_topk object proposals for image i.
     """
-    if isintance(images, list):
+    if isinstance(images, list):
         image_sizes = images[0].image_sizes  # in (h, w) order
     else:
         image_sizes = images.image_sizes  # in (h, w) order

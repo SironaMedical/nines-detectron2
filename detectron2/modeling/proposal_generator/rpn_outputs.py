@@ -89,7 +89,7 @@ def find_top_rpn_proposals(
             stores post_nms_topk object proposals for image i, sorted by their
             objectness score in descending order.
     """
-    if isintance(images, list):
+    if isinstance(images, list):
         image_sizes = images[0].image_sizes  # in (h, w) order
     else:
         image_sizes = images.image_sizes  # in (h, w) order
@@ -252,7 +252,7 @@ class RPNOutputs(object):
         self.anchors = anchors
         self.gt_boxes = gt_boxes
         self.num_feature_maps = len(pred_objectness_logits)
-        if isintance(images, list):
+        if isinstance(images, list):
             self.num_images = len(images[0])
             self.image_sizes = images[0].image_sizes
         else:
