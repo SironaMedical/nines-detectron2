@@ -153,7 +153,6 @@ class FPN(Backbone):
                 bottom_up_features[k] = mv
                 i = i + 1
         else:
-            x = x[0]
             bottom_up_features = self.bottom_up(x.tensor)
         x = [bottom_up_features[f] for f in self.in_features[::-1]]
         results = []
