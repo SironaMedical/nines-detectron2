@@ -153,7 +153,8 @@ class FPN(Backbone):
                 bottom_up_features[k] = mv
                 i = i + 1
         else:
-            bottom_up_features = self.bottom_up(x[0].tensor)
+            x = x[0]
+            bottom_up_features = self.bottom_up(x.tensor)
         x = [bottom_up_features[f] for f in self.in_features[::-1]]
         results = []
         prev_features = self.lateral_convs[0](x[0])

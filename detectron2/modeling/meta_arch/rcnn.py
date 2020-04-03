@@ -188,37 +188,54 @@ class GeneralizedRCNN(nn.Module):
         Normalize, pad and batch the input images.
         """
         if self.late_fusion:
-            # ipdb> p len(batched_inputs)
-            # 2020-04-02 22:10:21 pid:4378 STDOUT:INFO - 8
-            # ipdb> p batched_inputs[0]['image'].shape
-            # 2020-04-02 22:05:58 pid:1170 STDOUT:INFO - torch.Size([5, 512, 512])
-            res = []
-            slabs = [x["image"].to(self.device) for x in batched_inputs]
-            for i in range(3):
-                r = []
-                for slab in slabs:
-                    image = slab[[i, i + 1, i + 2]]
-                    image = self.normalizer(image)
-                    r.append(image)
-                res.append(ImageList.from_tensors(r, self.backbone.size_divisibility))
-            # ipdb> p len(res)
-            # 2020-04-02 22:08:54 pid:4378 STDOUT:INFO - 3
-            # ipdb> p res[0]
-            # 2020-04-02 22:09:15 pid:4378 STDOUT:INFO - <detectron2.structures.image_list.ImageList object at 0x7fab23f5b7b8>
-            # ipdb> p res[0].tensor.shape
-            # 2020-04-02 22:09:28 pid:4378 STDOUT:INFO - torch.Size([8, 3, 512, 512])
-            return res
+            return self._preprocess_image_late_fusion(batched_inputs)
         else:
-            # ipdb> p len(batched_inputs)
-            # 2020-04-02 22:12:58 pid:6335 STDOUT:INFO - 8
-            # ipdb> p batched_inputs[0]['image'].shape
-            # 2020-04-02 22:13:10 pid:6335 STDOUT:INFO - torch.Size([3, 512, 512])
-            images = [x["image"].to(self.device) for x in batched_inputs]
-            images = [self.normalizer(x) for x in images]
-            images = ImageList.from_tensors(images, self.backbone.size_divisibility)
-            # ipdb> p images.tensor.shape
-            # 2020-04-02 22:13:30 pid:6335 STDOUT:INFO - torch.Size([8, 3, 512, 512])
-            return images
+            return self._preprocess_image_default(batched_inputs)
+
+    def _preprocess_image_late_fusion(self, batched_inputs):
+        """Preprocess the batched inputs into a format suitable for a late fusion model.
+
+        Arguments:
+            batched_inputs : a list of dictionaries of length batch_size, where each dict has an
+                image of shape [C, H, W].
+
+        Returns:
+            slabs : a list of ImageList objects fo length C-2 (number of slabs), where each entry
+                is of shape [N, 3, H, W].
+        """
+        images = [x["image"].to(self.device) for x in batched_inputs]
+        slabs = []
+        num_channels, _, _ = images[0].shape
+        num_slabs = num_channels - 2
+        batch_size = len(images)
+        for slab_index in range(num_slabs):
+            slab = []
+            for batch_index in range(batch_size):
+                # image : a tensor of shape [3, H, W] for a given batch_index/slab_index.
+                image = images[batch_index][[slab_index, slab_index + 1, slab_index + 2]]
+                image = self.normalizer(image)
+                # slab : a list of tensors of length batch_size, where each tensor is of shape
+                #        [3, H, W].
+                slab.append(image)
+            # slabs : a list of ImageList objects of length slab_size, where each entry is of
+            #         shape [N, 3, H, W].
+            slabs.append(ImageList.from_tensors(slab, self.backbone.size_divisibility))
+        return slabs
+
+    def _preprocess_image_default(self, batched_inputs):
+        """Preprocess the batched inputs into a format suitable for a default model.
+
+        Arguments:
+            batched_inputs : a list of dictionaries of length batch_size, where each dict has an
+                image of shape [3, H, W].
+
+        Returns:
+            images : an ImageList object of shape [N, 3, H, W].
+        """
+        images = [x["image"].to(self.device) for x in batched_inputs]
+        images = [self.normalizer(x) for x in images]
+        images = ImageList.from_tensors(images, self.backbone.size_divisibility)
+        return images
 
     @staticmethod
     def _postprocess(instances, batched_inputs, image_sizes):
