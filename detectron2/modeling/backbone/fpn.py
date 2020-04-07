@@ -197,7 +197,7 @@ class LateFusionFPN(FPN):
     def forward(self, x):
         """
         Args:
-            slabs : a list of ImageList objects fo length C-2 (number of slabs), where each entry
+            slabs : a list of ImageList objects of length num_slabs, where each entry
                 is of shape [N, 3, H, W].
 
         We run each slab through the resnet backbone and generate the corresponding feature maps.
