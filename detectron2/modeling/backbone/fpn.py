@@ -127,12 +127,12 @@ class FPN(Backbone):
                 paper convention: "p<stage>", where stage has stride = 2 ** stage e.g.,
                 ["p2", "p3", ..., "p6"].
         """
-        # Reverse feature maps into top-down order (from low to high resolution)
         bottom_up_features = self.bottom_up(x)
-        x = [bottom_up_features[f] for f in self.in_features[::-1]]
-        return self._forward(x, bottom_up_features)
+        return self._forward(bottom_up_features)
 
-    def _forward(self, x, bottom_up_features):
+    def _forward(self, bottom_up_features):
+        # Reverse feature maps into top-down order (from low to high resolution)
+        x = [bottom_up_features[f] for f in self.in_features[::-1]]
         results = []
         prev_features = self.lateral_convs[0](x[0])
         results.append(self.output_convs[0](prev_features))
@@ -199,7 +199,6 @@ class LateFusionFPN(FPN):
         Returns:
             please refer to FPN's forward for the corresponding docstring.
         """
-        # Reverse feature maps into top-down order (from low to high resolution)
         buf = collections.defaultdict(list)
         for x_i in x:
             bottom_up_features_i = self.bottom_up(x_i.tensor)
@@ -212,8 +211,7 @@ class LateFusionFPN(FPN):
             mv = self.mapping_convs[i](v)
             bottom_up_features[k] = mv
             i = i + 1
-        x = [bottom_up_features[f] for f in self.in_features[::-1]]
-        return self._forward(x, bottom_up_features)
+        return self._forward(bottom_up_features)
 
 
 def _assert_strides_are_log2_contiguous(strides):
