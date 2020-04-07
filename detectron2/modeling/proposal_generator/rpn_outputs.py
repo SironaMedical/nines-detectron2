@@ -58,6 +58,7 @@ def find_top_rpn_proposals(
     post_nms_topk,
     min_box_side_len,
     training,
+    late_fusion,
 ):
     """
     For each feature map, select the `pre_nms_topk` highest scoring proposals,
@@ -89,7 +90,10 @@ def find_top_rpn_proposals(
             stores post_nms_topk object proposals for image i, sorted by their
             objectness score in descending order.
     """
-    image_sizes = images.image_sizes  # in (h, w) order
+    if late_fusion:
+        image_sizes = images[0].image_sizes  # in (h, w) order
+    else:
+        image_sizes = images.image_sizes  # in (h, w) order
     num_images = len(image_sizes)
     device = proposals[0].device
 
@@ -209,6 +213,7 @@ class RPNOutputs(object):
         boundary_threshold=0,
         gt_boxes=None,
         smooth_l1_beta=0.0,
+        late_fusion=False,
     ):
         """
         Args:
@@ -247,8 +252,12 @@ class RPNOutputs(object):
         self.anchors = anchors
         self.gt_boxes = gt_boxes
         self.num_feature_maps = len(pred_objectness_logits)
-        self.num_images = len(images)
-        self.image_sizes = images.image_sizes
+        if late_fusion:
+            self.num_images = len(images[0])
+            self.image_sizes = images[0].image_sizes
+        else:
+            self.num_images = len(images)
+            self.image_sizes = images.image_sizes
         self.boundary_threshold = boundary_threshold
         self.smooth_l1_beta = smooth_l1_beta
 

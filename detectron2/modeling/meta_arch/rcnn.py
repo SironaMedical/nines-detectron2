@@ -43,6 +43,9 @@ class GeneralizedRCNN(nn.Module):
         self.normalizer = lambda x: (x - pixel_mean) / pixel_std
         self.to(self.device)
 
+        self.late_fusion = cfg.MODEL.LATE_FUSION.ENABLED
+        self.late_fusion_preprocess_mode = cfg.MODEL.LATE_FUSION.PREPROCESS_MODE
+
     def visualize_training(self, batched_inputs, proposals):
         """
         A function used to visualize images and proposals. It shows ground truth
@@ -118,7 +121,10 @@ class GeneralizedRCNN(nn.Module):
         else:
             gt_instances = None
 
-        features = self.backbone(images.tensor)
+        if self.late_fusion:
+            features = self.backbone(images)
+        else:
+            features = self.backbone(images.tensor)
 
         if self.proposal_generator:
             proposals, proposal_losses = self.proposal_generator(images, features, gt_instances)
@@ -158,7 +164,10 @@ class GeneralizedRCNN(nn.Module):
         assert not self.training
 
         images = self.preprocess_image(batched_inputs)
-        features = self.backbone(images.tensor)
+        if self.late_fusion:
+            features = self.backbone(images)
+        else:
+            features = self.backbone(images.tensor)
 
         if detected_instances is None:
             if self.proposal_generator:
@@ -173,13 +182,79 @@ class GeneralizedRCNN(nn.Module):
             results = self.roi_heads.forward_with_given_boxes(features, detected_instances)
 
         if do_postprocess:
-            return GeneralizedRCNN._postprocess(results, batched_inputs, images.image_sizes)
+            if self.late_fusion:
+                image_sizes = images[0].image_sizes
+            else:
+                image_sizes = images.image_sizes
+            return GeneralizedRCNN._postprocess(results, batched_inputs, image_sizes)
         else:
             return results
 
     def preprocess_image(self, batched_inputs):
         """
         Normalize, pad and batch the input images.
+        """
+        if self.late_fusion:
+            return self._preprocess_image_late_fusion(
+                batched_inputs, self.late_fusion_preprocess_mode
+            )
+        else:
+            return self._preprocess_image_default(batched_inputs)
+
+    def _preprocess_image_late_fusion(self, batched_inputs, preprocess_mode):
+        """Preprocess the batched inputs into a format suitable for a late fusion model.
+
+        Arguments:
+            batched_inputs : a list of dictionaries of length batch_size, where each dict has an
+                image of shape [C, H, W].
+            preprocess_mode : a string representing how to construct the slabs:
+                strided : [0,1,2,3,4] -> [[0,1,2],[1,2,3],[2,3,4]], num_slabs = C-2
+                repeated : [0,1,2] -> [[0,0,0],[1,1,1],[2,2,2]], num_slabs = C
+
+        Returns:
+            slabs : a list of ImageList objects of length num_slabs, where each entry
+                is of shape [N, 3, H, W].
+        """
+        images = [x["image"].to(self.device) for x in batched_inputs]
+        slabs = []
+        num_channels, _, _ = images[0].shape
+        if preprocess_mode == "strided":
+            num_slabs = num_channels - 2
+        elif preprocess_mode == "repeated":
+            num_slabs = num_channels
+        else:
+            raise ValueError(f"Invalid preprocess mode for late fusion : {preprocess_mode}")
+        batch_size = len(images)
+        for slab_index in range(num_slabs):
+            slab = []
+            for batch_index in range(batch_size):
+                # image : a tensor of shape [3, H, W] for a given batch_index/slab_index.
+                if preprocess_mode == "strided":
+                    image = images[batch_index][[slab_index, slab_index + 1, slab_index + 2]]
+                elif preprocess_mode == "repeated":
+                    image = images[batch_index][[slab_index, slab_index, slab_index]]
+                else:
+                    raise ValueError(
+                        f"Invalid preprocess mode for late fusion : {preprocess_mode}"
+                    )
+                image = self.normalizer(image)
+                # slab : a list of tensors of length batch_size, where each tensor is of shape
+                #        [3, H, W].
+                slab.append(image)
+            # slabs : a list of ImageList objects of length num_slabs, where each entry is of
+            #         shape [N, 3, H, W].
+            slabs.append(ImageList.from_tensors(slab, self.backbone.size_divisibility))
+        return slabs
+
+    def _preprocess_image_default(self, batched_inputs):
+        """Preprocess the batched inputs into a format suitable for a default model.
+
+        Arguments:
+            batched_inputs : a list of dictionaries of length batch_size, where each dict has an
+                image of shape [3, H, W].
+
+        Returns:
+            images : an ImageList object of shape [N, 3, H, W].
         """
         images = [x["image"].to(self.device) for x in batched_inputs]
         images = [self.normalizer(x) for x in images]

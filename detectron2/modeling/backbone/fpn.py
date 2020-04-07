@@ -4,13 +4,21 @@ import fvcore.nn.weight_init as weight_init
 import torch.nn.functional as F
 from torch import nn
 
+import collections
+import torch
+
 from detectron2.layers import Conv2d, ShapeSpec, get_norm
 
 from .backbone import Backbone
 from .build import BACKBONE_REGISTRY
 from .resnet import build_resnet_backbone
 
-__all__ = ["build_resnet_fpn_backbone", "build_retinanet_resnet_fpn_backbone", "FPN"]
+__all__ = [
+    "build_resnet_fpn_backbone",
+    "build_retinanet_resnet_fpn_backbone",
+    "FPN",
+    "LateFusionFPN",
+]
 
 
 class FPN(Backbone):
@@ -51,14 +59,14 @@ class FPN(Backbone):
         # Feature map strides and channels from the bottom up network (e.g. ResNet)
         input_shapes = bottom_up.output_shape()
         in_strides = [input_shapes[f].stride for f in in_features]
-        in_channels = [input_shapes[f].channels for f in in_features]
+        self.in_channels = [input_shapes[f].channels for f in in_features]
 
         _assert_strides_are_log2_contiguous(in_strides)
         lateral_convs = []
         output_convs = []
 
         use_bias = norm == ""
-        for idx, in_channels in enumerate(in_channels):
+        for idx, in_channels in enumerate(self.in_channels):
             lateral_norm = get_norm(norm, out_channels)
             output_norm = get_norm(norm, out_channels)
 
@@ -119,8 +127,11 @@ class FPN(Backbone):
                 paper convention: "p<stage>", where stage has stride = 2 ** stage e.g.,
                 ["p2", "p3", ..., "p6"].
         """
-        # Reverse feature maps into top-down order (from low to high resolution)
         bottom_up_features = self.bottom_up(x)
+        return self._forward(bottom_up_features)
+
+    def _forward(self, bottom_up_features):
+        # Reverse feature maps into top-down order (from low to high resolution)
         x = [bottom_up_features[f] for f in self.in_features[::-1]]
         results = []
         prev_features = self.lateral_convs[0](x[0])
@@ -150,6 +161,65 @@ class FPN(Backbone):
             )
             for name in self._out_features
         }
+
+
+class LateFusionFPN(FPN):
+    """
+    This module inherits from FPN and implements a 2.5D backbone using late fusion.
+    """
+
+    def __init__(
+        self,
+        num_slabs,
+        bottom_up,
+        in_features,
+        out_channels,
+        norm="",
+        top_block=None,
+        fuse_type="sum",
+    ):
+        """
+        Args:
+            num_slabs : number of slabs and thus the number of times we will run the backbone.
+            please refer to FPN's __init__ for the remaining corresponding docstrings.
+        """
+        super(LateFusionFPN, self).__init__(
+            bottom_up, in_features, out_channels, norm, top_block, fuse_type
+        )
+
+        self.mapping_convs = []
+        for i, in_channels_i in enumerate(self.in_channels):
+            mapping_conv = Conv2d(in_channels_i * num_slabs, in_channels_i, kernel_size=1)
+            weight_init.c2_xavier_fill(mapping_conv)
+            self.add_module("fpn_mapping{}".format(i), mapping_conv)
+            self.mapping_convs.append(mapping_conv)
+
+    def forward(self, x):
+        """
+        Args:
+            slabs : a list of ImageList objects of length num_slabs, where each entry
+                is of shape [N, 3, H, W].
+
+        We run each slab through the resnet backbone and generate the corresponding feature maps.
+        We then combine the feature maps across slabs using a 1x1 conv that goes from:
+            `number of channels * number of slabs` -> `number of channels`
+
+        Returns:
+            please refer to FPN's forward for the corresponding docstring.
+        """
+        buf = collections.defaultdict(list)
+        for x_i in x:
+            bottom_up_features_i = self.bottom_up(x_i.tensor)
+            for k, v in bottom_up_features_i.items():
+                buf[k].append(v)
+        bottom_up_features = {}
+        i = 0
+        for k, vs in buf.items():
+            v = torch.cat(vs, dim=1)
+            mv = self.mapping_convs[i](v)
+            bottom_up_features[k] = mv
+            i = i + 1
+        return self._forward(bottom_up_features)
 
 
 def _assert_strides_are_log2_contiguous(strides):
@@ -210,14 +280,25 @@ def build_resnet_fpn_backbone(cfg, input_shape: ShapeSpec):
     bottom_up = build_resnet_backbone(cfg, input_shape)
     in_features = cfg.MODEL.FPN.IN_FEATURES
     out_channels = cfg.MODEL.FPN.OUT_CHANNELS
-    backbone = FPN(
-        bottom_up=bottom_up,
-        in_features=in_features,
-        out_channels=out_channels,
-        norm=cfg.MODEL.FPN.NORM,
-        top_block=LastLevelMaxPool(),
-        fuse_type=cfg.MODEL.FPN.FUSE_TYPE,
-    )
+    if cfg.MODEL.LATE_FUSION.ENABLED:
+        backbone = LateFusionFPN(
+            num_slabs=cfg.MODEL.LATE_FUSION.NUM_SLABS,
+            bottom_up=bottom_up,
+            in_features=in_features,
+            out_channels=out_channels,
+            norm=cfg.MODEL.FPN.NORM,
+            top_block=LastLevelMaxPool(),
+            fuse_type=cfg.MODEL.FPN.FUSE_TYPE,
+        )
+    else:
+        backbone = FPN(
+            bottom_up=bottom_up,
+            in_features=in_features,
+            out_channels=out_channels,
+            norm=cfg.MODEL.FPN.NORM,
+            top_block=LastLevelMaxPool(),
+            fuse_type=cfg.MODEL.FPN.FUSE_TYPE,
+        )
     return backbone
 
 
