@@ -94,6 +94,8 @@ class RPN(nn.Module):
     def __init__(self, cfg, input_shape: Dict[str, ShapeSpec]):
         super().__init__()
 
+        self.late_fusion = cfg.MODEL.LATE_FUSION
+
         # fmt: off
         self.min_box_side_len        = cfg.MODEL.PROPOSAL_GENERATOR.MIN_SIZE
         self.in_features             = cfg.MODEL.RPN.IN_FEATURES
@@ -158,6 +160,7 @@ class RPN(nn.Module):
             self.boundary_threshold,
             gt_boxes,
             self.smooth_l1_beta,
+            self.late_fusion,
         )
 
         if self.training:
@@ -180,6 +183,7 @@ class RPN(nn.Module):
                 self.post_nms_topk[self.training],
                 self.min_box_side_len,
                 self.training,
+                self.late_fusion,
             )
 
         return proposals, losses

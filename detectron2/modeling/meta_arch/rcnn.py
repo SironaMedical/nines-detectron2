@@ -120,7 +120,10 @@ class GeneralizedRCNN(nn.Module):
         else:
             gt_instances = None
 
-        features = self.backbone(images)
+        if self.late_fusion:
+            features = self.backbone(images)
+        else:
+            features = self.backbone(images.tensor)
 
         if self.proposal_generator:
             proposals, proposal_losses = self.proposal_generator(images, features, gt_instances)
@@ -160,7 +163,10 @@ class GeneralizedRCNN(nn.Module):
         assert not self.training
 
         images = self.preprocess_image(batched_inputs)
-        features = self.backbone(images)
+        if self.late_fusion:
+            features = self.backbone(images)
+        else:
+            features = self.backbone(images.tensor)
 
         if detected_instances is None:
             if self.proposal_generator:
@@ -175,7 +181,7 @@ class GeneralizedRCNN(nn.Module):
             results = self.roi_heads.forward_with_given_boxes(features, detected_instances)
 
         if do_postprocess:
-            if isinstance(images, list):
+            if self.late_fusion:
                 images_sizes = images[0].image_sizes
             else:
                 images_sizes = images.image_sizes
