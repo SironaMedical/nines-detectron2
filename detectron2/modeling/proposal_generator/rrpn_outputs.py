@@ -107,9 +107,7 @@ def find_top_rrpn_proposals(
 
         topk_proposals.append(topk_proposals_i)
         topk_scores.append(topk_scores_i)
-        level_ids.append(
-            torch.full((num_proposals_i,), level_id, dtype=torch.int64, device=device)
-        )
+        level_ids.append(torch.full((num_proposals_i,), level_id, dtype=torch.int64, device=device))
 
     # 2. Concat all levels together
     topk_scores = cat(topk_scores, dim=1)
