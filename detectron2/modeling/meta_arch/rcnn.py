@@ -43,7 +43,7 @@ class GeneralizedRCNN(nn.Module):
         self.normalizer = lambda x: (x - pixel_mean) / pixel_std
         self.to(self.device)
 
-        self.late_fusion = cfg.MODEL.LATE_FUSION
+        self.late_fusion = cfg.MODEL.LATE_FUSION.ENABLED
 
     def visualize_training(self, batched_inputs, proposals):
         """

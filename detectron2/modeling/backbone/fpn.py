@@ -169,11 +169,19 @@ class LateFusionFPN(FPN):
     """
 
     def __init__(
-        self, bottom_up, in_features, out_channels, norm="", top_block=None, fuse_type="sum"
+        self,
+        num_slabs,
+        bottom_up,
+        in_features,
+        out_channels,
+        norm="",
+        top_block=None,
+        fuse_type="sum",
     ):
         """
         Args:
-            please refer to FPN's __init__ for the corresponding docstrings.
+            num_slabs : number of slabs and thus the number of times we will run the backbone.
+            please refer to FPN's __init__ for the remaining corresponding docstrings.
         """
         super(LateFusionFPN, self).__init__(
             bottom_up, in_features, out_channels, norm, top_block, fuse_type
@@ -181,7 +189,7 @@ class LateFusionFPN(FPN):
 
         self.mapping_convs = []
         for i, in_channels_i in enumerate(self.in_channels):
-            mapping_conv = Conv2d(in_channels_i * 3, in_channels_i, kernel_size=1)
+            mapping_conv = Conv2d(in_channels_i * num_slabs, in_channels_i, kernel_size=1)
             weight_init.c2_xavier_fill(mapping_conv)
             self.add_module("fpn_mapping{}".format(i), mapping_conv)
             self.mapping_convs.append(mapping_conv)
@@ -272,18 +280,25 @@ def build_resnet_fpn_backbone(cfg, input_shape: ShapeSpec):
     bottom_up = build_resnet_backbone(cfg, input_shape)
     in_features = cfg.MODEL.FPN.IN_FEATURES
     out_channels = cfg.MODEL.FPN.OUT_CHANNELS
-    if cfg.MODEL.LATE_FUSION:
-        backbone_cls = LateFusionFPN
+    if cfg.MODEL.LATE_FUSION.ENABLED:
+        backbone = LateFusionFPN(
+            num_slabs=cfg.MODEL.LATE_FUSION.NUM_SLABS,
+            bottom_up=bottom_up,
+            in_features=in_features,
+            out_channels=out_channels,
+            norm=cfg.MODEL.FPN.NORM,
+            top_block=LastLevelMaxPool(),
+            fuse_type=cfg.MODEL.FPN.FUSE_TYPE,
+        )
     else:
-        backbone_cls = FPN
-    backbone = backbone_cls(
-        bottom_up=bottom_up,
-        in_features=in_features,
-        out_channels=out_channels,
-        norm=cfg.MODEL.FPN.NORM,
-        top_block=LastLevelMaxPool(),
-        fuse_type=cfg.MODEL.FPN.FUSE_TYPE,
-    )
+        backbone = FPN(
+            bottom_up=bottom_up,
+            in_features=in_features,
+            out_channels=out_channels,
+            norm=cfg.MODEL.FPN.NORM,
+            top_block=LastLevelMaxPool(),
+            fuse_type=cfg.MODEL.FPN.FUSE_TYPE,
+        )
     return backbone
 
 

@@ -94,7 +94,7 @@ class RPN(nn.Module):
     def __init__(self, cfg, input_shape: Dict[str, ShapeSpec]):
         super().__init__()
 
-        self.late_fusion = cfg.MODEL.LATE_FUSION
+        self.late_fusion = cfg.MODEL.LATE_FUSION.ENABLED
 
         # fmt: off
         self.min_box_side_len        = cfg.MODEL.PROPOSAL_GENERATOR.MIN_SIZE
