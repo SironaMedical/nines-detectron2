@@ -59,14 +59,14 @@ class FPN(Backbone):
         # Feature map strides and channels from the bottom up network (e.g. ResNet)
         input_shapes = bottom_up.output_shape()
         in_strides = [input_shapes[f].stride for f in in_features]
-        in_channels = [input_shapes[f].channels for f in in_features]
+        self.in_channels = [input_shapes[f].channels for f in in_features]
 
         _assert_strides_are_log2_contiguous(in_strides)
         lateral_convs = []
         output_convs = []
 
         use_bias = norm == ""
-        for idx, in_channels in enumerate(in_channels):
+        for idx, in_channels in enumerate(self.in_channels):
             lateral_norm = get_norm(norm, out_channels)
             output_norm = get_norm(norm, out_channels)
 
@@ -164,21 +164,41 @@ class FPN(Backbone):
 
 
 class LateFusionFPN(FPN):
+    """
+    This module inherits from FPN and implements a 2.5D backbone using late fusion.
+    """
+
     def __init__(
         self, bottom_up, in_features, out_channels, norm="", top_block=None, fuse_type="sum"
     ):
+        """
+        Args:
+            please refer to FPN's __init__ for the corresponding docstrings.
+        """
         super(LateFusionFPN, self).__init__(
             bottom_up, in_features, out_channels, norm, top_block, fuse_type
         )
 
         self.mapping_convs = []
-        for i, in_channels_i in enumerate(in_channels):
+        for i, in_channels_i in enumerate(self.in_channels):
             mapping_conv = Conv2d(in_channels_i * 3, in_channels_i, kernel_size=1)
             weight_init.c2_xavier_fill(mapping_conv)
             self.add_module("fpn_mapping{}".format(i), mapping_conv)
             self.mapping_convs.append(mapping_conv)
 
     def forward(self, x):
+        """
+        Args:
+            slabs : a list of ImageList objects fo length C-2 (number of slabs), where each entry
+                is of shape [N, 3, H, W].
+
+        We run each slab through the resnet backbone and generate the corresponding feature maps.
+        We then combine the feature maps across slabs using a 1x1 conv that goes from:
+            `number of channels * number of slabs` -> `number of channels`
+
+        Returns:
+            please refer to FPN's forward for the corresponding docstring.
+        """
         # Reverse feature maps into top-down order (from low to high resolution)
         buf = collections.defaultdict(list)
         for x_i in x:
@@ -255,23 +275,17 @@ def build_resnet_fpn_backbone(cfg, input_shape: ShapeSpec):
     in_features = cfg.MODEL.FPN.IN_FEATURES
     out_channels = cfg.MODEL.FPN.OUT_CHANNELS
     if cfg.MODEL.LATE_FUSION:
-        backbone = LateFusionFPN(
-            bottom_up=bottom_up,
-            in_features=in_features,
-            out_channels=out_channels,
-            norm=cfg.MODEL.FPN.NORM,
-            top_block=LastLevelMaxPool(),
-            fuse_type=cfg.MODEL.FPN.FUSE_TYPE,
-        )
+        backbone_cls = LateFusionFPN
     else:
-        backbone = FPN(
-            bottom_up=bottom_up,
-            in_features=in_features,
-            out_channels=out_channels,
-            norm=cfg.MODEL.FPN.NORM,
-            top_block=LastLevelMaxPool(),
-            fuse_type=cfg.MODEL.FPN.FUSE_TYPE,
-        )
+        backbone_cls = FPN
+    backbone = backbone_cls(
+        bottom_up=bottom_up,
+        in_features=in_features,
+        out_channels=out_channels,
+        norm=cfg.MODEL.FPN.NORM,
+        top_block=LastLevelMaxPool(),
+        fuse_type=cfg.MODEL.FPN.FUSE_TYPE,
+    )
     return backbone
 
 
