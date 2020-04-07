@@ -182,9 +182,9 @@ class GeneralizedRCNN(nn.Module):
 
         if do_postprocess:
             if self.late_fusion:
-                images_sizes = images[0].image_sizes
+                image_sizes = images[0].image_sizes
             else:
-                images_sizes = images.image_sizes
+                image_sizes = images.image_sizes
             return GeneralizedRCNN._postprocess(results, batched_inputs, image_sizes)
         else:
             return results
