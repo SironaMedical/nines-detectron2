@@ -47,7 +47,6 @@ def find_top_rrpn_proposals(
     post_nms_topk,
     min_box_side_len,
     training,
-    late_fusion,
 ):
     """
     For each feature map, select the `pre_nms_topk` highest scoring proposals,
@@ -78,10 +77,7 @@ def find_top_rrpn_proposals(
         proposals (list[Instances]): list of N Instances. The i-th Instances
             stores post_nms_topk object proposals for image i.
     """
-    if late_fusion:
-        image_sizes = images[0].image_sizes  # in (h, w) order
-    else:
-        image_sizes = images.image_sizes  # in (h, w) order
+    image_sizes = images.image_sizes  # in (h, w) order
     num_images = len(image_sizes)
     device = proposals[0].device
 
@@ -162,7 +158,6 @@ class RRPNOutputs(RPNOutputs):
         boundary_threshold=0,
         gt_boxes=None,
         smooth_l1_beta=0.0,
-        late_fusion=False,
     ):
         """
         Args:
@@ -204,7 +199,6 @@ class RRPNOutputs(RPNOutputs):
             boundary_threshold,
             gt_boxes,
             smooth_l1_beta,
-            late_fusion,
         )
 
     def _get_ground_truth(self):

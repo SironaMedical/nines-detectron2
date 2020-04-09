@@ -149,14 +149,6 @@ _C.MODEL.FPN.FUSE_TYPE = "sum"
 
 
 # ---------------------------------------------------------------------------- #
-# Late Fusion options
-# ---------------------------------------------------------------------------- #
-_C.MODEL.LATE_FUSION = CN({"ENABLED": False})
-_C.MODEL.LATE_FUSION.NUM_SLABS = 3
-_C.MODEL.LATE_FUSION.PREPROCESS_MODE = "strided"
-
-
-# ---------------------------------------------------------------------------- #
 # Proposal generator options
 # ---------------------------------------------------------------------------- #
 _C.MODEL.PROPOSAL_GENERATOR = CN()

@@ -47,7 +47,6 @@ class RRPN(RPN):
             self.boundary_threshold,
             gt_boxes,
             self.smooth_l1_beta,
-            self.late_fusion,
         )
 
         if self.training:
@@ -70,7 +69,6 @@ class RRPN(RPN):
                 self.post_nms_topk[self.training],
                 self.min_box_side_len,
                 self.training,
-                self.late_fusion,
             )
 
         return proposals, losses
