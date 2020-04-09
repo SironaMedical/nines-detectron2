@@ -254,6 +254,7 @@ def build_resnet_fpn_backbone(cfg, input_shape: ShapeSpec):
         norm=cfg.MODEL.FPN.NORM,
         top_block=LastLevelMaxPool(),
         fuse_type=cfg.MODEL.FPN.FUSE_TYPE,
+        late_fusion=cfg.MODEL.LATE_FUSION.ENABLED,
     )
     return backbone
 
