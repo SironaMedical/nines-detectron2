@@ -56,9 +56,14 @@ class FPN(Backbone):
         in_strides = [input_shapes[f].stride for f in in_features]
         in_channels = [input_shapes[f].channels for f in in_features]
 
+        use_bias = norm == ""
+
         self.mapping_convs = []
         for i, in_channels_i in enumerate(in_channels):
-            mapping_conv = Conv2d(in_channels_i * 3, in_channels_i, kernel_size=1)
+            mapping_norm = get_norm(norm, in_channels_i)
+            mapping_conv = Conv2d(
+                in_channels_i * 3, in_channels_i, kernel_size=1, bias=use_bias, norm=mapping_norm
+            )
             weight_init.c2_xavier_fill(mapping_conv)
             self.add_module("fpn_mapping{}".format(i), mapping_conv)
             self.mapping_convs.append(mapping_conv)
@@ -67,7 +72,6 @@ class FPN(Backbone):
         lateral_convs = []
         output_convs = []
 
-        use_bias = norm == ""
         for idx, in_channels in enumerate(in_channels):
             lateral_norm = get_norm(norm, out_channels)
             output_norm = get_norm(norm, out_channels)
