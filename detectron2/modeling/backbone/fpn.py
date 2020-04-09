@@ -54,6 +54,9 @@ class FPN(Backbone):
             fuse_type (str): types for fusing the top down features and the lateral
                 ones. It can be "sum" (default), which sums up element-wise; or "avg",
                 which takes the element-wise mean of the two.
+            late_fusion (bool): whether to use late fusion for a 2.5D model. In this case we will
+                get a list of images, run the backbone on each, and use a conv to combine the
+                features across backbone feature maps before constructing the FPN layers.
         """
         super(FPN, self).__init__()
         assert isinstance(bottom_up, Backbone)
