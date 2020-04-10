@@ -168,14 +168,7 @@ class LateFusionFPN(Backbone):
     """
 
     def __init__(
-        self,
-        bottom_up,
-        in_features,
-        out_channels,
-        norm="",
-        top_block=None,
-        fuse_type="sum",
-        late_fusion=False,
+        self, bottom_up, in_features, out_channels, norm="", top_block=None, fuse_type="sum"
     ):
         """
         Args:
@@ -199,9 +192,6 @@ class LateFusionFPN(Backbone):
             fuse_type (str): types for fusing the top down features and the lateral
                 ones. It can be "sum" (default), which sums up element-wise; or "avg",
                 which takes the element-wise mean of the two.
-            late_fusion (bool): whether to use late fusion for a 2.5D model. In this case we will
-                get a list of images, run the backbone on each, and use a conv to combine the
-                features across backbone feature maps before constructing the FPN layers.
         """
         super(FPN, self).__init__()
         assert isinstance(bottom_up, Backbone)
@@ -213,22 +203,15 @@ class LateFusionFPN(Backbone):
 
         use_bias = norm == ""
 
-        self.late_fusion = late_fusion
-
-        if self.late_fusion:
-            self.mapping_convs = []
-            for i, in_channels_i in enumerate(in_channels):
-                mapping_norm = get_norm(norm, in_channels_i)
-                mapping_conv = Conv2d(
-                    in_channels_i * 3,
-                    in_channels_i,
-                    kernel_size=1,
-                    bias=use_bias,
-                    norm=mapping_norm,
-                )
-                weight_init.c2_xavier_fill(mapping_conv)
-                self.add_module("fpn_mapping{}".format(i), mapping_conv)
-                self.mapping_convs.append(mapping_conv)
+        self.mapping_convs = []
+        for i, in_channels_i in enumerate(in_channels):
+            mapping_norm = get_norm(norm, in_channels_i)
+            mapping_conv = Conv2d(
+                in_channels_i * 3, in_channels_i, kernel_size=1, bias=use_bias, norm=mapping_norm
+            )
+            weight_init.c2_xavier_fill(mapping_conv)
+            self.add_module("fpn_mapping{}".format(i), mapping_conv)
+            self.mapping_convs.append(mapping_conv)
 
         _assert_strides_are_log2_contiguous(in_strides)
         lateral_convs = []
@@ -296,21 +279,18 @@ class LateFusionFPN(Backbone):
                 ["p2", "p3", ..., "p6"].
         """
         # Reverse feature maps into top-down order (from low to high resolution)
-        if self.late_fusion:
-            buf = collections.defaultdict(list)
-            for x_i in x:
-                bottom_up_features_i = self.bottom_up(x_i.tensor)
-                for k, v in bottom_up_features_i.items():
-                    buf[k].append(v)
-            bottom_up_features = {}
-            i = 0
-            for k, vs in buf.items():
-                v = torch.cat(vs, dim=1)
-                mv = self.mapping_convs[i](v)
-                bottom_up_features[k] = mv
-                i = i + 1
-        else:
-            bottom_up_features = self.bottom_up(x)
+        buf = collections.defaultdict(list)
+        for x_i in x:
+            bottom_up_features_i = self.bottom_up(x_i.tensor)
+            for k, v in bottom_up_features_i.items():
+                buf[k].append(v)
+        bottom_up_features = {}
+        i = 0
+        for k, vs in buf.items():
+            v = torch.cat(vs, dim=1)
+            mv = self.mapping_convs[i](v)
+            bottom_up_features[k] = mv
+            i = i + 1
         x = [bottom_up_features[f] for f in self.in_features[::-1]]
         results = []
         prev_features = self.lateral_convs[0](x[0])
@@ -430,7 +410,6 @@ def build_resnet_late_fusion_fpn_backbone(cfg, input_shape: ShapeSpec):
         norm=cfg.MODEL.FPN.NORM,
         top_block=LastLevelMaxPool(),
         fuse_type=cfg.MODEL.FPN.FUSE_TYPE,
-        late_fusion=cfg.MODEL.LATE_FUSION.ENABLED,
     )
     return backbone
 
