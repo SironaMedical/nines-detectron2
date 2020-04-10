@@ -14,7 +14,7 @@ from ..proposal_generator import build_proposal_generator
 from ..roi_heads import build_roi_heads
 from .build import META_ARCH_REGISTRY
 
-__all__ = ["GeneralizedRCNN", "ProposalNetwork"]
+__all__ = ["GeneralizedRCNN", "GeneralizedLateFusionRCNN", "ProposalNetwork"]
 
 
 @META_ARCH_REGISTRY.register()
