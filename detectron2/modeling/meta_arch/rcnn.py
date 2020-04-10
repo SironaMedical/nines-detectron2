@@ -43,8 +43,6 @@ class GeneralizedRCNN(nn.Module):
         self.normalizer = lambda x: (x - pixel_mean) / pixel_std
         self.to(self.device)
 
-        self.late_fusion = cfg.MODEL.LATE_FUSION.ENABLED
-
     def visualize_training(self, batched_inputs, proposals):
         """
         A function used to visualize images and proposals. It shows ground truth
@@ -190,22 +188,10 @@ class GeneralizedRCNN(nn.Module):
         """
         Normalize, pad and batch the input images.
         """
-        if self.late_fusion:
-            res = []
-            slabs = [x["image"].to(self.device) for x in batched_inputs]
-            for i in range(3):
-                r = []
-                for slab in slabs:
-                    image = slab[[i, i + 1, i + 2]]
-                    image = self.normalizer(image)
-                    r.append(image)
-                res.append(ImageList.from_tensors(r, self.backbone.size_divisibility))
-            return res
-        else:
-            images = [x["image"].to(self.device) for x in batched_inputs]
-            images = [self.normalizer(x) for x in images]
-            images = ImageList.from_tensors(images, self.backbone.size_divisibility)
-            return images
+        images = [x["image"].to(self.device) for x in batched_inputs]
+        images = [self.normalizer(x) for x in images]
+        images = ImageList.from_tensors(images, self.backbone.size_divisibility)
+        return images
 
     @staticmethod
     def _postprocess(instances, batched_inputs, image_sizes):
@@ -222,6 +208,24 @@ class GeneralizedRCNN(nn.Module):
             r = detector_postprocess(results_per_image, height, width)
             processed_results.append({"instances": r})
         return processed_results
+
+
+@META_ARCH_REGISTRY.register()
+class GeneralizedLateFusionRCNN(GeneralizedRCNN):
+    def preprocess_image(self, batched_inputs):
+        """
+        Normalize, pad and batch the input images.
+        """
+        res = []
+        slabs = [x["image"].to(self.device) for x in batched_inputs]
+        for i in range(3):
+            r = []
+            for slab in slabs:
+                image = slab[[i, i + 1, i + 2]]
+                image = self.normalizer(image)
+                r.append(image)
+            res.append(ImageList.from_tensors(r, self.backbone.size_divisibility))
+        return res
 
 
 @META_ARCH_REGISTRY.register()
