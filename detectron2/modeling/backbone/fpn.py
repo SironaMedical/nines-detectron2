@@ -193,7 +193,7 @@ class LateFusionFPN(Backbone):
                 ones. It can be "sum" (default), which sums up element-wise; or "avg",
                 which takes the element-wise mean of the two.
         """
-        super(FPN, self).__init__()
+        super(LateFusionFPN, self).__init__()
         assert isinstance(bottom_up, Backbone)
 
         # Feature map strides and channels from the bottom up network (e.g. ResNet)
