@@ -162,8 +162,11 @@ class FPN(Backbone):
 
 class MultiSlabLateFusionFPN(Backbone):
     """
-    This module implements Feature Pyramid Network.
+    This module implements Feature Pyramid Network with multi slab late fusion.
     It creates pyramid features built on top of some input feature maps.
+    These feature maps are obtained by running each of the slabs through a resnet backbone to
+    generate features at multiple scales for each slab track.
+    The feature maps from each of the slab tracks are then combined using a conv layer.
     """
 
     def __init__(
