@@ -1,11 +1,10 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+import collections
 import math
 import fvcore.nn.weight_init as weight_init
+import torch
 import torch.nn.functional as F
 from torch import nn
-
-import collections
-import torch
 
 from detectron2.layers import Conv2d, ShapeSpec, get_norm
 
@@ -15,10 +14,10 @@ from .resnet import build_resnet_backbone
 
 __all__ = [
     "build_resnet_fpn_backbone",
-    "build_resnet_late_fusion_fpn_backbone",
+    "build_resnet_multi_slab_late_fusion_fpn_backbone",
     "build_retinanet_resnet_fpn_backbone",
     "FPN",
-    "LateFusionFPN",
+    "MultiSlabLateFusionFPN",
 ]
 
 
@@ -161,7 +160,7 @@ class FPN(Backbone):
         }
 
 
-class LateFusionFPN(Backbone):
+class MultiSlabLateFusionFPN(Backbone):
     """
     This module implements Feature Pyramid Network.
     It creates pyramid features built on top of some input feature maps.
@@ -193,7 +192,7 @@ class LateFusionFPN(Backbone):
                 ones. It can be "sum" (default), which sums up element-wise; or "avg",
                 which takes the element-wise mean of the two.
         """
-        super(LateFusionFPN, self).__init__()
+        super(MultiSlabLateFusionFPN, self).__init__()
         assert isinstance(bottom_up, Backbone)
 
         # Feature map strides and channels from the bottom up network (e.g. ResNet)
@@ -392,7 +391,7 @@ def build_resnet_fpn_backbone(cfg, input_shape: ShapeSpec):
 
 
 @BACKBONE_REGISTRY.register()
-def build_resnet_late_fusion_fpn_backbone(cfg, input_shape: ShapeSpec):
+def build_resnet_multi_slab_late_fusion_fpn_backbone(cfg, input_shape: ShapeSpec):
     """
     Args:
         cfg: a detectron2 CfgNode
@@ -403,7 +402,7 @@ def build_resnet_late_fusion_fpn_backbone(cfg, input_shape: ShapeSpec):
     bottom_up = build_resnet_backbone(cfg, input_shape)
     in_features = cfg.MODEL.FPN.IN_FEATURES
     out_channels = cfg.MODEL.FPN.OUT_CHANNELS
-    backbone = LateFusionFPN(
+    backbone = MultiSlabLateFusionFPN(
         bottom_up=bottom_up,
         in_features=in_features,
         out_channels=out_channels,

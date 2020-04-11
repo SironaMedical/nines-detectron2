@@ -7,7 +7,7 @@ from .anchor_generator import build_anchor_generator, ANCHOR_GENERATOR_REGISTRY
 from .backbone import (
     BACKBONE_REGISTRY,
     FPN,
-    LateFusionFPN,
+    MultiSlabLateFusionFPN,
     Backbone,
     ResNet,
     ResNetBlockBase,
@@ -19,7 +19,7 @@ from .meta_arch import (
     META_ARCH_REGISTRY,
     SEM_SEG_HEADS_REGISTRY,
     GeneralizedRCNN,
-    GeneralizedLateFusionRCNN,
+    GeneralizedMultiSlabLateFusionRCNN,
     PanopticFPN,
     ProposalNetwork,
     RetinaNet,

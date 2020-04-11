@@ -14,7 +14,7 @@ from ..proposal_generator import build_proposal_generator
 from ..roi_heads import build_roi_heads
 from .build import META_ARCH_REGISTRY
 
-__all__ = ["GeneralizedRCNN", "GeneralizedLateFusionRCNN", "ProposalNetwork"]
+__all__ = ["GeneralizedRCNN", "GeneralizedMultiSlabLateFusionRCNN", "ProposalNetwork"]
 
 
 @META_ARCH_REGISTRY.register()
@@ -211,7 +211,7 @@ class GeneralizedRCNN(nn.Module):
 
 
 @META_ARCH_REGISTRY.register()
-class GeneralizedLateFusionRCNN(GeneralizedRCNN):
+class GeneralizedMultiSlabLateFusionRCNN(GeneralizedRCNN):
     def preprocess_image(self, batched_inputs):
         """
         Normalize, pad and batch the input images.
