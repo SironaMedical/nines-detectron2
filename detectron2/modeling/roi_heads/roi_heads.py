@@ -493,6 +493,7 @@ class StandardROIHeads(ROIHeads):
         box_pooler: ROIPooler,
         box_head: nn.Module,
         box_predictor: nn.Module,
+        freeze_box_head: bool,
         mask_in_features: Optional[List[str]] = None,
         mask_pooler: Optional[ROIPooler] = None,
         mask_head: Optional[nn.Module] = None,
@@ -525,6 +526,7 @@ class StandardROIHeads(ROIHeads):
         self.box_pooler = box_pooler
         self.box_head = box_head
         self.box_predictor = box_predictor
+        self.freeze_box_head = freeze_box_head
 
         self.mask_on = mask_in_features is not None
         if self.mask_on:
@@ -591,6 +593,7 @@ class StandardROIHeads(ROIHeads):
             "box_pooler": box_pooler,
             "box_head": box_head,
             "box_predictor": box_predictor,
+            "freeze_box_head": cfg.MODEL.ROI_BOX_HEAD.FREEZE,
         }
 
     @classmethod
@@ -662,7 +665,11 @@ class StandardROIHeads(ROIHeads):
         del targets
 
         if self.training:
-            losses = self._forward_box(features, proposals)
+            if self.freeze_box_head:
+                with torch.no_grad():
+                    losses = self._forward_box(features, proposals)
+            else:
+                losses = self._forward_box(features, proposals)
             # Usually the original proposals used by the box head are used by the mask, keypoint
             # heads. But when `self.train_on_pred_boxes is True`, proposals will contain boxes
             # predicted by the box head.
