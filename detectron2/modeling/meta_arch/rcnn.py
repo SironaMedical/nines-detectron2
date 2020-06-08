@@ -39,6 +39,9 @@ class GeneralizedRCNN(nn.Module):
         self.register_buffer("pixel_mean", torch.Tensor(cfg.MODEL.PIXEL_MEAN).view(-1, 1, 1))
         self.register_buffer("pixel_std", torch.Tensor(cfg.MODEL.PIXEL_STD).view(-1, 1, 1))
 
+        self.freeze_backbone = cfg.MODEL.BACKBONE.FREEZE
+        self.freeze_proposal_generator = cfg.MODEL.PROPOSAL_GENERATOR.FREEZE
+
     @property
     def device(self):
         return self.pixel_mean.device
@@ -119,12 +122,25 @@ class GeneralizedRCNN(nn.Module):
             gt_instances = None
 
         if isinstance(images, list):
-            features = self.backbone(images)
+            backbone_input = images
         else:
-            features = self.backbone(images.tensor)
+            backbone_input = images.tensor
+        if self.freeze_backbone:
+            with torch.no_grad():
+                features = self.backbone(backbone_input)
+        else:
+            features = self.backbone(backbone_input)
 
         if self.proposal_generator:
-            proposals, proposal_losses = self.proposal_generator(images, features, gt_instances)
+            if self.freeze_proposal_generator:
+                with torch.no_grad():
+                    proposals, proposal_losses = self.proposal_generator(
+                        images, features, gt_instances
+                    )
+            else:
+                proposals, proposal_losses = self.proposal_generator(
+                    images, features, gt_instances
+                )
         else:
             assert "proposals" in batched_inputs[0]
             proposals = [x["proposals"].to(self.device) for x in batched_inputs]
